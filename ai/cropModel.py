@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import json
 model = tf.keras.models.load_model("crop_disease_model.h5")
 
 def predict_disease(image_path):
@@ -10,6 +10,8 @@ def predict_disease(image_path):
     img = img.reshape(1,224,224,3)
 
     prediction = model.predict(img)
-    classes = ["Healthy", "Leaf Curl", "Blight"]
-
+    with open("class_indices.json") as f:
+        class_indices = json.load(f)
+    # classes = list(class_indices.keys())["Healthy", "Leaf Curl", "Blight"]
+    classes = list(class_indices.keys())    
     return classes[prediction.argmax()]

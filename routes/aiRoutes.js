@@ -8,7 +8,7 @@ router.post("/crop-doctor", upload.single("image"), (req, res) => {
   const imagePath = req.file.path;
 
   exec(`python ai/predict.py ${imagePath}`, (err, stdout) => {
-    if (err) return res.status(500).send(err);
+    if (err) return res.status(500).send("ai error Error processing image");
 
     res.send({
       disease: stdout.trim(),
