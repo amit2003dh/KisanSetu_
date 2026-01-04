@@ -8,7 +8,10 @@ const productSchema = new mongoose.Schema({
   crop: String,
   price: Number,
   stock: Number,
-  verified: { type: Boolean, default: false }
+  verified: { type: Boolean, default: false },
+  image: String
+}, {
+  timestamps: true
 });
 
 module.exports = mongoose.model("Product", productSchema);

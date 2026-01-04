@@ -7,7 +7,10 @@ const cropSchema = new mongoose.Schema({
   quantity: Number,
   price: Number,
   harvestDate: Date,
-  status: { type: String, default: "Available" }
+  status: { type: String, default: "Available" },
+  image: String
+}, {
+  timestamps: true
 });
 
 module.exports = mongoose.model("Crop", cropSchema);

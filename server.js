@@ -13,7 +13,13 @@ const server = http.createServer(app);
 app.use(express.json());
 app.use(cors());
 
-connectDB();
+// Serve uploaded files
+app.use("/uploads", express.static("uploads"));
+
+// Connect to database (non-blocking)
+connectDB().catch((err) => {
+  console.error("Database connection failed:", err.message);
+});
 
 // Routes
 app.use("/api/users", require("./routes/userRoutes"));
