@@ -6,6 +6,7 @@ export default function Cart() {
   const navigate = useNavigate();
   const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
   const [currentUser, setCurrentUser] = useState(null);
+  const [quantityInputs, setQuantityInputs] = useState({});
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -122,6 +123,25 @@ export default function Cart() {
                       <div style={{ fontSize: "18px", fontWeight: "700", color: "var(--primary-green)", marginTop: "8px" }}>
                         ₹{item.price?.toFixed(2) || 0} per unit
                       </div>
+                      {/* Show stock for products, quantity for crops */}
+                      {item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && (
+                        <div style={{ 
+                          fontSize: "14px", 
+                          color: item.availableQuantity > 0 ? "var(--text-secondary)" : "var(--error)",
+                          marginTop: "4px"
+                        }}>
+                          Available: {item.availableQuantity} kg
+                        </div>
+                      )}
+                      {item.type !== "crop" && item.stock !== undefined && item.stock !== null && (
+                        <div style={{ 
+                          fontSize: "14px", 
+                          color: item.stock > 0 ? "var(--text-secondary)" : "var(--error)",
+                          marginTop: "4px"
+                        }}>
+                          Stock: {item.stock} units
+                        </div>
+                      )}
                     </div>
 
                     <button
@@ -149,60 +169,196 @@ export default function Cart() {
                     </button>
                   </div>
 
-                  <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
-                    <label style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "600" }}>
-                      Quantity:
-                    </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button
-                        onClick={() => updateQuantity(item._id, item.type, Math.max(1, item.quantity - 1))}
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          border: "1px solid var(--border)",
-                          background: "white",
-                          borderRadius: "var(--border-radius-sm)",
-                          cursor: "pointer",
-                          fontSize: "18px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "var(--text-primary)"
-                        }}
-                      >
-                        −
-                      </button>
-                      <span style={{
-                        minWidth: "40px",
-                        textAlign: "center",
-                        fontSize: "16px",
-                        fontWeight: "600",
-                        color: "var(--text-primary)"
+                  <div style={{ marginTop: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <label style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "600" }}>
+                        Quantity:
+                      </label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          onClick={() => updateQuantity(item._id, item.type, Math.max(1, item.quantity - 1))}
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            border: "1px solid var(--border)",
+                            background: "white",
+                            borderRadius: "var(--border-radius-sm)",
+                            cursor: "pointer",
+                            fontSize: "18px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--text-primary)"
+                          }}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max={
+                            item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null
+                              ? item.availableQuantity
+                              : item.stock !== undefined && item.stock !== null
+                              ? item.stock
+                              : undefined
+                          }
+                          value={quantityInputs[`${item._id}-${item.type}`] !== undefined 
+                            ? quantityInputs[`${item._id}-${item.type}`] 
+                            : item.quantity}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            const itemKey = `${item._id}-${item.type}`;
+                            // Allow empty input while typing
+                            if (inputValue === "") {
+                              setQuantityInputs({ ...quantityInputs, [itemKey]: "" });
+                              return;
+                            }
+                            const numValue = parseInt(inputValue, 10);
+                            if (!isNaN(numValue) && numValue > 0) {
+                              setQuantityInputs({ ...quantityInputs, [itemKey]: numValue });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const itemKey = `${item._id}-${item.type}`;
+                            const inputValue = e.target.value;
+                            
+                            if (inputValue === "" || inputValue === "0") {
+                              // If empty or 0, reset to current quantity
+                              setQuantityInputs({ ...quantityInputs, [itemKey]: undefined });
+                              return;
+                            }
+                            
+                            const numValue = parseInt(inputValue, 10);
+                            if (isNaN(numValue) || numValue < 1) {
+                              // Invalid input, reset to current quantity
+                              setQuantityInputs({ ...quantityInputs, [itemKey]: undefined });
+                              return;
+                            }
+                            
+                            // Get the available limit
+                            const availableLimit = item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null
+                              ? item.availableQuantity
+                              : item.stock !== undefined && item.stock !== null
+                              ? item.stock
+                              : null;
+                            
+                            // Limit to available stock/quantity
+                            const finalQuantity = availableLimit !== null 
+                              ? Math.min(numValue, availableLimit)
+                              : numValue;
+                            
+                            // Update quantity
+                            updateQuantity(item._id, item.type, finalQuantity);
+                            
+                            // Clear input state to show updated value
+                            setQuantityInputs({ ...quantityInputs, [itemKey]: undefined });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.target.blur();
+                            }
+                          }}
+                          style={{
+                            width: "60px",
+                            height: "32px",
+                            border: "2px solid var(--border)",
+                            borderRadius: "var(--border-radius-sm)",
+                            textAlign: "center",
+                            fontSize: "16px",
+                            fontWeight: "600",
+                            color: "var(--text-primary)",
+                            padding: "0 4px"
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            const newQuantity = item.quantity + 1;
+                            // For crops, use availableQuantity field; for products, use stock field
+                            if (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null) {
+                              // Limit to available crop quantity
+                              updateQuantity(item._id, item.type, Math.min(newQuantity, item.availableQuantity));
+                            } else if (item.stock !== undefined && item.stock !== null) {
+                              // Limit to available product stock
+                              updateQuantity(item._id, item.type, Math.min(newQuantity, item.stock));
+                            } else {
+                              updateQuantity(item._id, item.type, newQuantity);
+                            }
+                          }}
+                          disabled={
+                            (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity) ||
+                            (item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock)
+                          }
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            border: "1px solid var(--border)",
+                            background: (
+                              (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity) ||
+                              (item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock)
+                            ) 
+                              ? "var(--background)" 
+                              : "white",
+                            borderRadius: "var(--border-radius-sm)",
+                            cursor: (
+                              (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity) ||
+                              (item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock)
+                            ) 
+                              ? "not-allowed" 
+                              : "pointer",
+                            fontSize: "18px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: (
+                              (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity) ||
+                              (item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock)
+                            )
+                              ? "var(--text-light)"
+                              : "var(--text-primary)",
+                            opacity: (
+                              (item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity) ||
+                              (item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock)
+                            ) 
+                              ? 0.5 
+                              : 1
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div style={{ marginLeft: "auto", fontSize: "18px", fontWeight: "700", color: "var(--primary-green)" }}>
+                        ₹{(item.price * item.quantity)?.toFixed(2) || 0}
+                      </div>
+                    </div>
+                    {/* Show warning for crops when quantity limit reached */}
+                    {item.type === "crop" && item.availableQuantity !== undefined && item.availableQuantity !== null && item.quantity >= item.availableQuantity && (
+                      <div style={{
+                        marginTop: "8px",
+                        padding: "8px 12px",
+                        background: "#fff3e0",
+                        border: "1px solid #ff9800",
+                        borderRadius: "var(--border-radius-sm)",
+                        fontSize: "13px",
+                        color: "#f57c00"
                       }}>
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item._id, item.type, item.quantity + 1)}
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          border: "1px solid var(--border)",
-                          background: "white",
-                          borderRadius: "var(--border-radius-sm)",
-                          cursor: "pointer",
-                          fontSize: "18px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "var(--text-primary)"
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div style={{ marginLeft: "auto", fontSize: "18px", fontWeight: "700", color: "var(--primary-green)" }}>
-                      ₹{(item.price * item.quantity)?.toFixed(2) || 0}
-                    </div>
+                        ⚠️ Maximum quantity reached. Only {item.availableQuantity} kg available.
+                      </div>
+                    )}
+                    {/* Show warning for products when stock limit reached */}
+                    {item.type !== "crop" && item.stock !== undefined && item.stock !== null && item.quantity >= item.stock && (
+                      <div style={{
+                        marginTop: "8px",
+                        padding: "8px 12px",
+                        background: "#fff3e0",
+                        border: "1px solid #ff9800",
+                        borderRadius: "var(--border-radius-sm)",
+                        fontSize: "13px",
+                        color: "#f57c00"
+                      }}>
+                        ⚠️ Maximum quantity reached. Only {item.stock} unit{item.stock !== 1 ? "s" : ""} available in stock.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

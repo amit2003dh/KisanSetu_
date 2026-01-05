@@ -234,9 +234,15 @@ export default function ProductStore() {
                     <button
                       onClick={() => addToCart({ ...product, type: product.type })}
                       className="btn btn-primary"
-                      style={{ padding: "10px 20px", fontSize: "14px" }}
+                      disabled={product.stock !== undefined && product.stock !== null && product.stock <= 0}
+                      style={{ 
+                        padding: "10px 20px", 
+                        fontSize: "14px",
+                        opacity: (product.stock !== undefined && product.stock !== null && product.stock <= 0) ? 0.6 : 1,
+                        cursor: (product.stock !== undefined && product.stock !== null && product.stock <= 0) ? "not-allowed" : "pointer"
+                      }}
                     >
-                      Add to Cart
+                      {(product.stock !== undefined && product.stock !== null && product.stock <= 0) ? "Out of Stock" : "Add to Cart"}
                     </button>
                   ) : (
                     <Link

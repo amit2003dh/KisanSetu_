@@ -90,6 +90,12 @@ export default function Login() {
       return;
     }
 
+    // Validate phone number (10 digits)
+    if (signupForm.phone && signupForm.phone.length !== 10) {
+      setError("Phone number must be exactly 10 digits");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -341,16 +347,31 @@ export default function Login() {
                 fontWeight: "600",
                 fontSize: "14px"
               }}>
-                Phone Number
+                Phone Number (10 digits)
               </label>
               <input
                 className="input"
                 type="tel"
-                placeholder="Enter your phone number"
+                placeholder="Enter 10-digit phone number"
                 value={signupForm.phone}
-                onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, ""); // Remove non-digits
+                  if (digitsOnly.length <= 10) {
+                    setSignupForm({ ...signupForm, phone: digitsOnly });
+                  }
+                }}
                 disabled={loading}
+                maxLength="10"
               />
+              {signupForm.phone && signupForm.phone.length !== 10 && (
+                <p style={{
+                  fontSize: "12px",
+                  color: "var(--error)",
+                  marginTop: "4px"
+                }}>
+                  Phone number must be exactly 10 digits
+                </p>
+              )}
             </div>
 
             <div style={{ marginBottom: "16px" }}>

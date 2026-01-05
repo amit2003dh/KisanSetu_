@@ -164,9 +164,15 @@ export default function CropList() {
                   <button
                     onClick={() => addToCart({ ...crop, type: "crop" })}
                     className="btn btn-primary"
-                    style={{ padding: "10px 20px", fontSize: "14px" }}
+                    disabled={crop.quantity === undefined || crop.quantity === null || crop.quantity <= 0}
+                    style={{ 
+                      padding: "10px 20px", 
+                      fontSize: "14px",
+                      opacity: (crop.quantity === undefined || crop.quantity === null || crop.quantity <= 0) ? 0.6 : 1,
+                      cursor: (crop.quantity === undefined || crop.quantity === null || crop.quantity <= 0) ? "not-allowed" : "pointer"
+                    }}
                   >
-                    Add to Cart
+                    {(crop.quantity === undefined || crop.quantity === null || crop.quantity <= 0) ? "Out of Stock" : "Add to Cart"}
                   </button>
                 ) : (
                   <Link

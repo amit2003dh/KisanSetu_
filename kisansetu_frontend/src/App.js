@@ -12,6 +12,7 @@ import CropDoctor from "./pages/CropDoctor";
 import Payment from "./pages/Payment";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Cart from "./pages/Cart";
+import Profile from "./pages/Profile";
 
 function AppContent() {
   const location = useLocation();
@@ -32,6 +33,7 @@ function AppContent() {
         <Route path="/tracking" element={<Tracking />} />
         <Route path="/crop-doctor" element={<CropDoctor />} />
         <Route path="/payment" element={<Payment />} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       </Routes>
     </>
   );

@@ -24,6 +24,55 @@ router.post("/create", async (req, res) => {
   }
 });
 
+// Create multiple orders from cart items
+router.post("/create-from-cart", async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        error: "Database not connected",
+        message: "MongoDB is not connected. Please check your database connection."
+      });
+    }
+
+    const { items, buyerId, paymentId } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        error: "Invalid cart items",
+        message: "Cart items are required"
+      });
+    }
+
+    // Create orders for each cart item
+    const orders = await Promise.all(
+      items.map(item => {
+        const order = new Order({
+          buyerId,
+          itemId: item._id || item.itemId,
+          itemType: item.type === "crop" ? "crop" : (item.type === "seed" || item.type === "pesticide" ? item.type : "product"),
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+          status: "Confirmed",
+          paymentId: paymentId || undefined
+        });
+        return order.save();
+      })
+    );
+
+    res.json({
+      success: true,
+      orders
+    });
+  } catch (error) {
+    console.error("Create orders from cart error:", error);
+    res.status(500).json({
+      error: "Failed to create orders",
+      message: error.message || "Failed to save orders"
+    });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {

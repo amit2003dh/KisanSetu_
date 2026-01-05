@@ -2,22 +2,34 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { apiCall } from "../api/api";
+import { useCart } from "../context/CartContext";
 
 export default function Payment() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { cart, clearCart } = useCart();
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [paymentDetails, setPaymentDetails] = useState(null);
+  const [fromCart, setFromCart] = useState(false);
 
   useEffect(() => {
     // Get amount from URL params
     const urlAmount = searchParams.get("amount");
     const cropId = searchParams.get("cropId");
     const productId = searchParams.get("productId");
+    const fromCartParam = searchParams.get("fromCart");
     
-    if (urlAmount) {
+    if (fromCartParam === "true" && cart.length > 0) {
+      // Payment from cart
+      setFromCart(true);
+      const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      setAmount(total);
+      setPaymentDetails({ items: cart });
+    } else if (urlAmount) {
+      // Single item payment
+      setFromCart(false);
       setAmount(parseFloat(urlAmount));
       setPaymentDetails({
         cropId,
@@ -27,7 +39,7 @@ export default function Payment() {
     } else {
       setError("No payment amount specified");
     }
-  }, [searchParams]);
+  }, [searchParams, cart]);
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -75,7 +87,9 @@ export default function Payment() {
         currency: "INR",
         order_id: orderData.id,
         name: "KisanSetu",
-        description: `Payment for ${paymentDetails?.itemType || "item"}`,
+        description: fromCart 
+          ? `Payment for ${cart.length} item${cart.length > 1 ? "s" : ""} from cart`
+          : `Payment for ${paymentDetails?.itemType || "item"}`,
         prefill: {
           name: "Customer",
           email: "customer@example.com",
@@ -94,12 +108,46 @@ export default function Payment() {
             return;
           }
 
-          // Create order record
-          if (paymentDetails) {
+          // Get current user
+          const user = localStorage.getItem("user");
+          const userData = user ? JSON.parse(user) : null;
+          const buyerId = userData?._id;
+
+          if (!buyerId) {
+            setError("User not found. Please login again.");
+            setLoading(false);
+            return;
+          }
+
+          // Create order record(s)
+          if (fromCart && paymentDetails?.items) {
+            // Create multiple orders from cart
+            const { data: ordersData, error: ordersError } = await apiCall(() =>
+              API.post("/orders/create-from-cart", {
+                items: paymentDetails.items,
+                buyerId,
+                paymentId: response.razorpay_payment_id
+              })
+            );
+
+            if (ordersError) {
+              setError("Failed to create orders. Payment was successful but orders were not created.");
+              setLoading(false);
+              return;
+            }
+
+            // Clear cart after successful payment
+            clearCart();
+          } else if (paymentDetails && !fromCart) {
+            // Single item order
             await apiCall(() =>
               API.post("/orders/create", {
-                ...paymentDetails,
+                buyerId,
+                itemId: paymentDetails.cropId || paymentDetails.productId,
+                itemType: paymentDetails.itemType,
                 quantity: 1,
+                price: amount,
+                total: amount,
                 status: "Confirmed",
                 paymentId: response.razorpay_payment_id
               })
@@ -177,10 +225,34 @@ export default function Payment() {
             paddingBottom: "12px",
             borderBottom: "1px solid var(--border)"
           }}>
-            <span style={{ color: "var(--text-secondary)" }}>Item Type:</span>
-            <strong style={{ color: "var(--text-primary)" }}>
-              {paymentDetails?.itemType === "crop" ? "🌾 Crop" : "🛒 Product"}
-            </strong>
+            {fromCart && cart.length > 0 ? (
+              <>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "8px"
+                }}>
+                  <span style={{ color: "var(--text-secondary)" }}>Items:</span>
+                  <strong style={{ color: "var(--text-primary)" }}>
+                    {cart.length} item{cart.length > 1 ? "s" : ""}
+                  </strong>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-light)", marginTop: "8px" }}>
+                  {cart.map((item, index) => (
+                    <div key={index} style={{ marginBottom: "4px" }}>
+                      {item.name} × {item.quantity} - ₹{(item.price * item.quantity).toFixed(2)}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "var(--text-secondary)" }}>Item Type:</span>
+                <strong style={{ color: "var(--text-primary)" }}>
+                  {paymentDetails?.itemType === "crop" ? "🌾 Crop" : "🛒 Product"}
+                </strong>
+              </>
+            )}
           </div>
           <div style={{
             display: "flex",

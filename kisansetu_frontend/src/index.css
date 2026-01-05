@@ -212,6 +212,10 @@ code {
   .grid[style*="gridTemplateColumns: 2fr 1fr"] {
     grid-template-columns: 1fr !important;
   }
+  
+  .profile-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .page-header {

@@ -6,7 +6,16 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
-  phone: String,
+  phone: {
+    type: String,
+    validate: {
+      validator: function(v) {
+        return !v || /^\d{10}$/.test(v);
+      },
+      message: 'Phone number must be exactly 10 digits'
+    }
+  },
+  profilePhoto: String,
   role: {
     type: String,
     enum: ["farmer", "buyer", "seller", "delivery", "admin"],

@@ -128,9 +128,34 @@ export default function Navbar() {
               paddingLeft: "16px",
               borderLeft: "1px solid rgba(255,255,255,0.3)"
             }}>
-              <span style={{ color: "white", fontSize: "14px" }}>
-                👤 {userName}
-              </span>
+              <Link
+                to="/profile"
+                style={{
+                  color: "white",
+                  textDecoration: "none",
+                  padding: "10px 16px",
+                  borderRadius: "var(--border-radius-sm)",
+                  background: isActive("/profile") ? "rgba(255,255,255,0.2)" : "transparent",
+                  transition: "background 0.3s",
+                  fontWeight: isActive("/profile") ? "600" : "400",
+                  fontSize: "15px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive("/profile")) {
+                    e.target.style.background = "rgba(255,255,255,0.1)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive("/profile")) {
+                    e.target.style.background = "transparent";
+                  }
+                }}
+              >
+                👤 Profile
+              </Link>
               <button
                 onClick={handleLogout}
                 style={{
