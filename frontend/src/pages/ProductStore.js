@@ -1,69 +1,72 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import API from "../api/api";
-import { apiCall } from "../api/api";
+import API, { apiCall } from "../api/api";
 import { useCart } from "../context/CartContext";
 
 export default function ProductStore() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("all"); // all, seed, pesticide
+  const [filter, setFilter] = useState("all");
   const [currentUser, setCurrentUser] = useState(null);
   const { addToCart } = useCart();
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   useEffect(() => {
-    // Get current user from localStorage
+    fetchProducts();
     const user = localStorage.getItem("user");
     if (user) {
       try {
-        const userData = JSON.parse(user);
-        setCurrentUser(userData);
+        setCurrentUser(JSON.parse(user));
       } catch (e) {
         console.error("Error parsing user data:", e);
       }
     }
-    fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
     setError("");
     
-    // If user is a seller, only show their products
-    // If user is a buyer or no user, show all verified products
-    let url = "/products";
-    const user = localStorage.getItem("user");
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        if (userData.role === "seller" && userData._id) {
-          url = `/products?sellerId=${userData._id}`;
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-    
-    const { data, error: err } = await apiCall(() => API.get(url));
-    
+    const { data, error: err } = await apiCall(() => API.get("/products"));
+    console.log("Fetched products:", data);
     if (err) {
       setError(err);
     } else {
-      setProducts(data || []);
+      const productsData = data || [];
+      console.log("Fetched products:", productsData);
+      // Log image paths for debugging
+      productsData.forEach(product => {
+        if (product.image) {
+          const imageUrl = product.image.startsWith("http") ? product.image : `${API_BASE_URL}${product.image}`;
+          console.log(`Product "${product.name}" image path:`, product.image, "Full URL:", imageUrl);
+        } else {
+          console.log(`Product "${product.name}" has no image`);
+        }
+      });
+      setProducts(productsData);
     }
     
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?._id]);
+  const canBuyProducts = () => {
+    if (!currentUser) return false;
+    // Farmers, Buyers can buy products. Sellers cannot.
+    return currentUser.role === "farmer" || currentUser.role === "buyer";
+  };
 
   const filteredProducts = filter === "all" 
     ? products 
     : products.filter(p => p.type === filter);
+
+  const handleAddToCart = (product) => {
+    if (!canBuyProducts()) {
+      alert("Sellers cannot buy products. You can only add and sell your own products.");
+      return;
+    }
+    addToCart(product);
+  };
 
   const getProductIcon = (type) => {
     return type === "seed" ? "🌱" : "🧪";
@@ -119,7 +122,7 @@ export default function ProductStore() {
           🧪 Pesticides
         </button>
       </div>
-
+{console.log("Filtered products:", filteredProducts)}
       {filteredProducts.length === 0 ? (
         <div className="empty-state card">
           <div style={{ fontSize: "64px", marginBottom: "16px" }}>🛒</div>
@@ -141,17 +144,59 @@ export default function ProductStore() {
                   <div style={{
                     width: "100%",
                     height: "180px",
-                    background: color === "#4caf50" 
-                      ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
-                      : "linear-gradient(135deg, #ff9800 0%, #f57c00 100%)",
                     borderRadius: "var(--border-radius-sm)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "64px",
-                    marginBottom: "16px"
+                    marginBottom: "16px",
+                    overflow: "hidden",
+                    background: "var(--background)",
+                    border: "1px solid var(--border)",
+                    position: "relative"
                   }}>
-                    {getProductIcon(product.type)}
+                    {product.image && product.image.trim() ? (
+                      <img 
+                        src={product.image.startsWith("http") ? product.image : `${API_BASE_URL}${product.image}`} 
+                        alt={product.name || "Product"} 
+                        style={{ 
+                          width: "100%", 
+                          height: "100%", 
+                          objectFit: "cover",
+                          display: "block"
+                        }}
+                        onError={(e) => {
+                          console.error("Failed to load product image:", product.image, "Full URL:", `${API_BASE_URL}${product.image}`);
+                          // Hide the broken image and show fallback
+                          e.target.style.display = "none";
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector(".product-fallback")) {
+                            const fallback = document.createElement("div");
+                            fallback.className = "product-fallback";
+                            const icon = product.type === "seed" ? "🌱" : "🧪";
+                            const bgColor = product.type === "seed" 
+                              ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
+                              : "linear-gradient(135deg, #ff9800 0%, #f57c00 100%)";
+                            fallback.style.cssText = `width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ${bgColor}; font-size: 64px; position: absolute; top: 0; left: 0;`;
+                            fallback.textContent = icon;
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log("Product image loaded successfully:", product.image);
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: color === "#4caf50" 
+                          ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
+                          : "linear-gradient(135deg, #ff9800 0%, #f57c00 100%)",
+                        fontSize: "64px"
+                      }}>
+                        {getProductIcon(product.type)}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
@@ -204,7 +249,27 @@ export default function ProductStore() {
                   <div style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
                     <div>
                       <strong>Stock:</strong> {product.stock || 0} units
+                      {product.initialStock && (
+                        <span style={{ fontSize: "12px", color: "#666", marginLeft: "8px" }}>
+                          (Initial: {product.initialStock})
+                        </span>
+                      )}
                     </div>
+                    {product.salesStats && (
+                      <div style={{ marginTop: "8px" }}>
+                        <div style={{ fontSize: "12px", color: "#666" }}>
+                          <strong>Total Sold:</strong> {product.salesStats.totalSold || 0} units
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#666" }}>
+                          <strong>Revenue:</strong> ₹{(product.salesStats.totalRevenue || 0).toLocaleString('en-IN')}
+                        </div>
+                        {product.salesStats.averageRating && (
+                          <div style={{ fontSize: "12px", color: "#666" }}>
+                            <strong>Rating:</strong> ⭐ {product.salesStats.averageRating.toFixed(1)} ({product.salesStats.reviewCount || 0} reviews)
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -245,13 +310,24 @@ export default function ProductStore() {
                       {(product.stock !== undefined && product.stock !== null && product.stock <= 0) ? "Out of Stock" : "Add to Cart"}
                     </button>
                   ) : (
-                    <Link
-                      to={`/payment?productId=${product._id}&amount=${product.price || 0}&type=product`}
+                    <button
+                      onClick={() => {
+                        addToCart({ ...product, type: product.type });
+                        // Optionally show a success message or navigate to cart
+                        // You can uncomment the line below if you want to navigate to cart after adding
+                        // navigate("/cart");
+                      }}
                       className="btn btn-primary"
-                      style={{ padding: "10px 20px", fontSize: "14px" }}
+                      disabled={product.stock !== undefined && product.stock !== null && product.stock <= 0}
+                      style={{ 
+                        padding: "10px 20px", 
+                        fontSize: "14px",
+                        opacity: (product.stock !== undefined && product.stock !== null && product.stock <= 0) ? 0.6 : 1,
+                        cursor: (product.stock !== undefined && product.stock !== null && product.stock <= 0) ? "not-allowed" : "pointer"
+                      }}
                     >
-                      Buy Now
-                    </Link>
+                      {(product.stock !== undefined && product.stock !== null && product.stock <= 0) ? "Out of Stock" : "Add to Cart"}
+                    </button>
                   )}
                 </div>
               </div>

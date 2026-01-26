@@ -1,97 +1,125 @@
 const router = require("express").Router();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fetch = require("node-fetch");
 
-// Initialize Gemini AI only if API key is available
-let genAI = null;
-try {
-  if (process.env.GEMINI_API_KEY) {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    console.log("✅ Gemini AI initialized successfully");
-  } else {
-    console.warn("⚠️ GEMINI_API_KEY not found in environment variables");
-  }
-} catch (error) {
-  console.error("❌ Gemini AI initialization error:", error.message);
+// Check API key availability once
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (GEMINI_API_KEY) {
+  console.log("✅ Gemini API key loaded");
+} else {
+  console.warn("⚠️ GEMINI_API_KEY not found in environment variables");
 }
 
 router.post("/voice-intent", async (req, res) => {
   try {
-    // Check if Gemini is initialized
-    if (!genAI) {
+    // API key check
+    if (!GEMINI_API_KEY) {
       return res.status(503).json({
+        success: false,
         error: "Gemini API not configured",
-        message: "Please set GEMINI_API_KEY in your environment variables",
+        message: "Please set GEMINI_API_KEY in environment variables",
         fallback: true
       });
     }
 
-    const { text } = req.body;
+    const { text, prompt } = req.body;
 
-    // Validate input
+    // Input validation
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return res.status(400).json({
+        success: false,
         error: "Invalid input",
         message: "Text is required and must be a non-empty string"
       });
     }
 
-    // Enhanced prompt for better intent recognition
-    const prompt = `You are an AI assistant for KisanSetu, an agricultural platform. 
-A farmer just said: "${text.trim()}"
+    // Use enhanced prompt if provided, otherwise use default
+    const finalPrompt = prompt || `
+You are an expert agriculture assistant for KisanSetu platform, specifically designed to help Indian farmers with practical farming advice.
 
-Analyze this query and identify the user's intent. Possible intents include:
-- Adding a new crop
-- Viewing crops
-- Checking orders
-- Buying seeds or pesticides
-- Using crop doctor
-- Tracking delivery
-- General question about farming
+A farmer said:
+"${text.trim()}"
 
-Respond with a clear, helpful intent description in the same language as the query. Keep it concise (1-2 sentences).`;
+Your task:
+- Provide SPECIFIC, ACTIONABLE advice for farmers
+- Respond in the SAME language as the query (Hindi or English)
+- Keep responses concise but detailed (2-3 sentences maximum)
+- Be professional yet friendly like a farming expert
+- Always give practical, implementable solutions
+- Include specific next steps when possible
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 200,
+Farmer-Specific Response Guidelines:
+- For crop health: Ask for crop name, symptoms, and photos. Suggest specific treatments.
+- For market prices: Ask for crop name and location. Give current market trends.
+- For orders: Direct to dashboard with specific steps.
+- For pesticides: Ask for crop and pest type. Recommend safe, approved options.
+- For fertilizers: Ask for soil type and crop. Suggest NPK ratios.
+- For weather: Ask for location. Give 7-day forecast and farming advice.
+- For irrigation: Ask for crop and soil moisture. Give water-saving tips.
+- For seeds: Ask for crop and season. Recommend high-yield varieties.
+
+IMPORTANT: Always provide specific, actionable advice that farmers can implement immediately. Avoid vague responses. If you need more information, ask specific questions.
+`;
+
+    // Gemini REST v1 call (STABLE)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: finalPrompt }]
+            }
+          ]
+        })
       }
-    });
+    );
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const intentText = response.text();
+    const data = await response.json();
+
+    // Handle Gemini-side errors
+    if (!data.candidates || data.candidates.length === 0) {
+      console.warn("⚠️ Gemini returned no candidates:", JSON.stringify(data, null, 2));
+
+      return res.json({
+        success: false,
+        error: "Gemini returned no response",
+        message: "AI could not process your request. Please try again.",
+        fallback: true
+      });
+    }
+
+    // Get the actual Gemini AI response
+    const intentText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!intentText) {
+      return res.json({
+        success: false,
+        error: "No response from Gemini",
+        message: "AI could not generate a response. Please try again.",
+        fallback: true
+      });
+    }
+
+    console.log("✅ Gemini AI Response:", intentText);
 
     res.json({
       success: true,
-      intent: intentText.trim(),
+      intent: intentText,
       originalText: text.trim()
     });
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    
-    // Handle specific Gemini API errors
-    if (error.message?.includes("API_KEY_INVALID")) {
-      return res.status(401).json({
-        error: "Invalid API Key",
-        message: "The Gemini API key is invalid. Please check your GEMINI_API_KEY in .env file"
-      });
-    }
+    console.error("❌ Gemini REST API Error:", error);
 
-    if (error.message?.includes("quota") || error.message?.includes("limit")) {
-      return res.status(429).json({
-        error: "API Quota Exceeded",
-        message: "Gemini API quota has been exceeded. Please try again later."
-      });
-    }
-
-    // Generic error response
     res.status(500).json({
+      success: false,
       error: "Gemini API Error",
-      message: error.message || "Failed to process request with Gemini API",
+      message: error.message || "Failed to process Gemini request",
       fallback: true
     });
   }
