@@ -18,7 +18,14 @@ const cropSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   harvestDate: { type: Date, required: true },
   status: { type: String, default: "Available", enum: ["Available", "Sold", "Reserved"] },
-  image: String, // Single image field only
+  images: {
+    type: [String],
+    default: []
+  },
+  primaryImageIndex: {
+    type: Number,
+    default: 0
+  },
   description: String,
   category: String,
   location: locationSchema,
@@ -29,7 +36,14 @@ const cropSchema = new mongoose.Schema({
   },
   qualityGrade: { type: String, enum: ["A", "B", "C"], default: "A" },
   availableUntil: Date,
-  minimumOrder: { type: Number, default: 1 }
+  minimumOrder: { type: Number, default: 1 },
+  
+  // ✅ Verification status
+  isApproved: {
+    type: String,
+    enum: ["pending", "approved", "rejected"],
+    default: "pending"
+  },
 }, {
   timestamps: true
 });
