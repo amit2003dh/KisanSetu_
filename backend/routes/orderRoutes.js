@@ -46,6 +46,7 @@ router.post("/create", authMiddleware, async (req, res) => {
     if (itemType === "crop") {
       console.log("🌾 Looking up crop:", itemId);
       const crop = await Crop.findById(itemId);
+      console.log("🌾 Full crop object:", crop);
       sellerId = crop?.sellerId;
       pickupAddress = crop?.location; // Get pickup location from crop
       actualPrice = crop?.price; // Get actual price from crop
@@ -58,6 +59,7 @@ router.post("/create", authMiddleware, async (req, res) => {
     } else {
       console.log("📦 Looking up product:", itemId);
       const product = await Product.findById(itemId);
+      console.log("📦 Full product object:", product);
       sellerId = product?.sellerId;
       pickupAddress = product?.location; // Get pickup location from product
       actualPrice = product?.price; // Get actual price from product
@@ -67,6 +69,19 @@ router.post("/create", authMiddleware, async (req, res) => {
       console.log("📦 Pickup location:", pickupAddress);
       console.log("📦 Actual price:", actualPrice);
       console.log("📦 Available stock:", availableQuantity);
+    }
+
+    // If no pickup address found, use a default one
+    if (!pickupAddress) {
+      console.log("⚠️ No pickup address found, using default");
+      pickupAddress = {
+        address: "Seller Location",
+        city: "Default City", 
+        state: "Default State",
+        pincode: "000000",
+        lat: 20.5937,
+        lng: 78.9629
+      };
     }
 
     // Use actual price from product/crop instead of request body price
@@ -267,7 +282,7 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
     const groupedItems = {};
     
     for (const item of items) {
-      const key = `${item.type}_${item._id}`;
+      const key = `${item.itemType}_${item.itemId}`;
       if (!groupedItems[key]) {
         groupedItems[key] = {
           ...item,
@@ -290,9 +305,10 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
       let actualPrice; // Get actual price from product/crop
       let availableQuantity; // Get available quantity for decrease
 
-      if (groupedItem.type === "crop") {
-        console.log("🌾 Looking up crop:", groupedItem._id);
-        const crop = await Crop.findById(groupedItem._id);
+      if (groupedItem.itemType === "crop") {
+        console.log("🌾 Looking up crop:", groupedItem.itemId);
+        const crop = await Crop.findById(groupedItem.itemId);
+        console.log("🌾 Full crop object:", crop);
         sellerId = crop?.sellerId;
         pickupAddress = crop?.location; // Get pickup location from crop
         actualPrice = crop?.price; // Get actual price from crop
@@ -304,8 +320,9 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
         console.log("🌾 Available quantity:", availableQuantity);
         console.log("🌾 Total requested quantity:", groupedItem.totalQuantity);
       } else {
-        console.log("📦 Looking up product:", groupedItem._id);
-        const product = await Product.findById(groupedItem._id);
+        console.log("📦 Looking up product:", groupedItem.itemId);
+        const product = await Product.findById(groupedItem.itemId);
+        console.log("📦 Full product object:", product);
         sellerId = product?.sellerId;
         pickupAddress = product?.location; // Get pickup location from product
         actualPrice = product?.price; // Get actual price from product
@@ -318,6 +335,19 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
         console.log("📦 Total requested quantity:", groupedItem.totalQuantity);
       }
 
+      // If no pickup address found, use a default one
+      if (!pickupAddress) {
+        console.log("⚠️ No pickup address found, using default");
+        pickupAddress = {
+          address: "Seller Location",
+          city: "Default City",
+          state: "Default State",
+          pincode: "000000",
+          lat: 20.5937,
+          lng: 78.9629
+        };
+      }
+
       // Use actual price from product/crop instead of cart price
       const finalPrice = actualPrice || groupedItem.price;
       console.log("🔍 Final price used for item:", finalPrice);
@@ -325,7 +355,7 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
       // Check if enough quantity is available
       if (availableQuantity !== undefined && availableQuantity < groupedItem.totalQuantity) {
         console.error("❌ Insufficient quantity available for item:", {
-          itemId: groupedItem._id,
+          itemId: groupedItem.itemId,
           requested: groupedItem.totalQuantity,
           available: availableQuantity
         });
@@ -333,17 +363,17 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
       }
 
       if (!sellerId) {
-        console.error("❌ Seller not found for item:", groupedItem._id);
+        console.error("❌ Seller not found for item:", groupedItem.itemId);
         continue; // Skip this item but continue with others
       }
 
       console.log("✅ Creating order for grouped item:", {
         buyerId: finalBuyerId,
         sellerId,
-        orderType: groupedItem.type === "crop" ? "crop_purchase" : "product_purchase",
+        orderType: groupedItem.itemType === "crop" ? "crop_purchase" : "product_purchase",
         items: [{
-          itemId: groupedItem._id,
-          itemType: groupedItem.type,
+          itemId: groupedItem.itemId,
+          itemType: groupedItem.itemType,
           name: groupedItem.name,
           quantity: groupedItem.totalQuantity, // Use total quantity
           price: finalPrice // Use actual price from product/crop
@@ -368,10 +398,10 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
       const order = await Order.create({
         buyerId: finalBuyerId,
         sellerId,
-        orderType: groupedItem.type === "crop" ? "crop_purchase" : "product_purchase",
+        orderType: groupedItem.itemType === "crop" ? "crop_purchase" : "product_purchase",
         items: [{
-          itemId: groupedItem._id,
-          itemType: groupedItem.type,
+          itemId: groupedItem.itemId,
+          itemType: groupedItem.itemType,
           name: groupedItem.name,
           quantity: groupedItem.totalQuantity, // Use total quantity
           price: finalPrice // Use actual price from product/crop
@@ -414,16 +444,16 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
 
     console.log("📦 Processing quantity/stock after successful order creation");
     for (const [key, groupedItem] of Object.entries(groupedItems)) {
-      console.log("🔍 Checking groupedItem.type for quantity decrease:", { type: groupedItem.type, itemId: groupedItem._id });
-      if (groupedItem.type === "crop") {
-        console.log("🌾 Decreasing crop quantity:", { itemId: groupedItem._id, quantity: groupedItem.totalQuantity });
+      console.log("🔍 Checking groupedItem.itemType for quantity decrease:", { type: groupedItem.itemType, itemId: groupedItem.itemId });
+      if (groupedItem.itemType === "crop") {
+        console.log("🌾 Decreasing crop quantity:", { itemId: groupedItem.itemId, quantity: groupedItem.totalQuantity });
         console.log("🌾 Current crop before update:");
-        const currentCrop = await Crop.findById(groupedItem._id);
+        const currentCrop = await Crop.findById(groupedItem.itemId);
         console.log("🌾 Crop details:", { id: currentCrop._id, name: currentCrop.name, currentQuantity: currentCrop.quantity });
         
         try {
           const itemPrice = groupedItem.price || 0;
-          await Crop.findByIdAndUpdate(groupedItem._id, { 
+          await Crop.findByIdAndUpdate(groupedItem.itemId, { 
             $inc: { 
               quantity: -groupedItem.totalQuantity,
               "salesStats.totalSold": groupedItem.totalQuantity,
@@ -432,18 +462,18 @@ router.post("/create-from-cart", authMiddleware, async (req, res) => {
           });
           
           console.log("✅ Crop quantity and sales stats updated successfully");
-          const updatedCrop = await Crop.findById(groupedItem._id);
+          const updatedCrop = await Crop.findById(groupedItem.itemId);
           console.log("🌾 Updated crop details:", { id: updatedCrop._id, name: updatedCrop.name, newQuantity: updatedCrop.quantity });
         } catch (cropError) {
           console.error("❌ Error updating crop quantity in cart:", cropError);
           console.error("❌ Cart crop error details:", cropError.message);
         }
       } else {
-        console.log("🔍 groupedItem.type is not 'crop', processing as product. groupedItem.type:", groupedItem.type);
+        console.log("🔍 groupedItem.itemType is not 'crop', processing as product. groupedItem.itemType:", groupedItem.itemType);
         try {
-          console.log("📦 Decreasing product stock:", { itemId: groupedItem._id, quantity: groupedItem.totalQuantity });
+          console.log("📦 Decreasing product stock:", { itemId: groupedItem.itemId, quantity: groupedItem.totalQuantity });
           const itemPrice = groupedItem.price || 0;
-          await Product.findByIdAndUpdate(groupedItem._id, { 
+          await Product.findByIdAndUpdate(groupedItem.itemId, { 
             $inc: { 
               stock: -groupedItem.totalQuantity,
               "salesStats.totalSold": groupedItem.totalQuantity,
@@ -731,24 +761,182 @@ router.put("/:id/status", authMiddleware, async (req, res) => {
 });
 
 /* ---------------------------------------------------
+   GET SINGLE ORDER BY ID
+--------------------------------------------------- */
+router.get("/:orderId", authMiddleware, async (req, res) => {
+  try {
+    console.log("🔍 GET SINGLE ORDER - ID:", req.params.orderId);
+    
+    const order = await Order.findById(req.params.orderId);
+    
+    if (!order) {
+      console.log("❌ Order not found:", req.params.orderId);
+      return res.status(404).json({ error: "Order not found" });
+    }
+    
+    console.log("✅ Order found:", order._id);
+    res.json(order);
+  } catch (error) {
+    console.error("❌ Get single order error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------------------------------------------
    ORDER CHAT
 --------------------------------------------------- */
 router.post("/:orderId/message", authMiddleware, async (req, res) => {
-  const message = await Message.create({
-    orderId: req.params.orderId,
-    senderId: req.userId,
-    senderType: req.body.senderType,
-    content: req.body.message,
-    messageType: "order_communication"
-  });
-
-  res.json({ success: true, message });
+  try {
+    console.log("📝 CREATE MESSAGE - Starting message creation");
+    console.log("🔍 Order ID:", req.params.orderId);
+    console.log("🔍 User ID:", req.userId);
+    console.log("🔍 Request body:", req.body);
+    
+    const { message, senderType } = req.body;
+    
+    console.log("🔍 Extracted data:", { message, senderType });
+    
+    if (!message || !message.trim()) {
+      console.log("❌ Empty message provided");
+      return res.status(400).json({ error: "Message content is required" });
+    }
+    
+    // Default senderType if not provided
+    const finalSenderType = senderType || "buyer";
+    console.log("🔍 Final senderType:", finalSenderType);
+    
+    // Validate senderType against allowed values
+    const allowedSenderTypes = ["buyer", "seller", "delivery_partner", "system", "farmer"];
+    if (!allowedSenderTypes.includes(finalSenderType)) {
+      console.log("❌ Invalid senderType:", finalSenderType);
+      return res.status(400).json({ 
+        error: "Invalid sender type",
+        allowedTypes: allowedSenderTypes,
+        receivedType: finalSenderType
+      });
+    }
+    
+    console.log("📝 Creating message with data:", {
+      orderId: req.params.orderId,
+      senderId: req.userId,
+      senderType: finalSenderType,
+      content: message.trim(),
+      messageType: "order_communication"
+    });
+    
+    const newMessage = await Message.create({
+      orderId: req.params.orderId,
+      senderId: req.userId,
+      senderType: finalSenderType,
+      content: message.trim(),
+      messageType: "order_communication"
+    });
+    
+    console.log("✅ Message created successfully:", newMessage._id);
+    res.json({ success: true, message: newMessage });
+    
+  } catch (error) {
+    console.error("❌ CREATE MESSAGE ERROR:", error);
+    console.error("❌ Error name:", error.name);
+    console.error("❌ Error message:", error.message);
+    if (error.errors) {
+      console.error("❌ Validation errors:", error.errors);
+      Object.keys(error.errors).forEach(key => {
+        console.error(`  - ${key}:`, error.errors[key].message);
+      });
+    }
+    res.status(500).json({ 
+      error: "Failed to send message",
+      details: error.message 
+    });
+  }
 });
 
 router.get("/:orderId/messages", authMiddleware, async (req, res) => {
-  const messages = await Message.find({ orderId: req.params.orderId })
-    .sort({ createdAt: 1 });
-  res.json(messages);
+  try {
+    console.log("📨 GET MESSAGES - Starting message retrieval");
+    console.log("🔍 Order ID:", req.params.orderId);
+    console.log("🔍 User ID:", req.userId);
+    console.log("🔍 User:", req.user);
+    
+    // Get order details to check delivery partner assignment
+    const order = await Order.findById(req.params.orderId);
+    if (!order) {
+      console.log("❌ Order not found:", req.params.orderId);
+      return res.status(404).json({ error: "Order not found" });
+    }
+    
+    console.log("🔍 Order found:", order._id);
+    console.log("🔍 Delivery partner assigned:", !!order.deliveryInfo?.deliveryPartnerId);
+    console.log("🔍 Order buyer:", order.buyerId);
+    console.log("🔍 Order seller:", order.sellerId);
+    
+    const isDeliveryPartnerAssigned = !!order.deliveryInfo?.deliveryPartnerId;
+    const currentUserId = req.userId;
+    const isBuyer = order.buyerId.toString() === currentUserId;
+    const isSeller = order.sellerId.toString() === currentUserId;
+    const isDeliveryPartner = isDeliveryPartnerAssigned && order.deliveryInfo.deliveryPartnerId.toString() === currentUserId;
+    
+    console.log("🔍 User role check:", { isBuyer, isSeller, isDeliveryPartner, isDeliveryPartnerAssigned });
+    
+    // Get all messages for this order with sender details populated
+    const allMessages = await Message.find({ orderId: req.params.orderId })
+      .populate('senderId', 'name email role')
+      .sort({ createdAt: 1 });
+    
+    console.log("📨 Total messages found:", allMessages.length);
+    
+    // TEMPORARY DEBUG: Return all messages without filtering
+    console.log("🐛 DEBUG MODE: Returning all messages without filtering");
+    return res.json(allMessages);
+    
+    // Filter messages based on visibility rules
+    const filteredMessages = allMessages.filter(message => {
+      console.log("🔍 Filtering message:", {
+        messageId: message._id,
+        senderType: message.senderType,
+        content: message.content?.substring(0, 20) + "...",
+        isBuyer,
+        isSeller,
+        isDeliveryPartner,
+        isDeliveryPartnerAssigned
+      });
+      
+      // If delivery partner is assigned, everyone sees all messages
+      if (isDeliveryPartnerAssigned) {
+        console.log("✅ Delivery partner assigned - message visible to all");
+        return true;
+      }
+      
+      // Before delivery partner assignment
+      if (message.senderType === "buyer" || message.senderType === "farmer") {
+        // Buyer/farmer messages visible to seller only
+        const visible = isSeller;
+        console.log(`🔍 ${message.senderType} message visible to seller:`, visible);
+        return visible;
+      } else if (message.senderType === "seller") {
+        // Seller messages visible to buyer only
+        const visible = isBuyer;
+        console.log("🔍 Seller message visible to buyer:", visible);
+        return visible;
+      } else if (message.senderType === "delivery_partner") {
+        // Delivery partner messages only visible after assignment
+        console.log("❌ Delivery partner message before assignment - not visible");
+        return false;
+      } else {
+        // System messages visible to everyone
+        console.log("✅ System message visible to all");
+        return true;
+      }
+    });
+    
+    console.log("📨 Filtered messages count:", filteredMessages.length);
+    res.json(filteredMessages);
+    
+  } catch (error) {
+    console.error("❌ GET MESSAGES ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

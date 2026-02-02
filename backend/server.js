@@ -29,7 +29,7 @@ const upload = multer({ storage: storage });
 
 app.use(express.json());
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "https://kisan-set-frontend-71z4.vercel.app"], // Allow frontend URLs
+  origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "https://kisan-set-frontend-71z4.vercel.app","https://kisan-set-frontend-71z4-git-main-amit2003dhs-projects.vercel.app" ,"https://kisan-setu-admin-git-main-amit2003dhs-projects.vercel.app","https://kisan-setu-admin.vercel.app"], // Allow frontend URLs - Updated for Vercel admin
   credentials: true // Allow cookies/headers
 }));
 
@@ -58,6 +58,7 @@ app.use("/api/tracker", require("./routes/trackerRoutes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/auth/admin", require("./routes/adminRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/crop-analysis", require("./routes/cropAnalysisSimple"));
 
 // Socket.io AFTER middleware
 const io = new Server(server, {

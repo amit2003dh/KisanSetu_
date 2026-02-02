@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { apiCall } from "../api/api";
@@ -22,11 +22,7 @@ export default function Profile() {
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
   const STATIC_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     setLoading(true);
     setError("");
     
@@ -49,15 +45,18 @@ export default function Profile() {
         location: data.location || ""
       });
       if (data.profilePhoto) {
-        // Add timestamp to ensure fresh image load
-        setPhotoPreview(`${STATIC_BASE_URL}${data.profilePhoto}?t=${Date.now()}`);
+        setPhotoPreview(`${STATIC_BASE_URL}${data.profilePhoto}`);
       } else {
         setPhotoPreview(null);
       }
     }
     
     setLoading(false);
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

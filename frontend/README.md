@@ -14,6 +14,10 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 The page will reload when you make changes.\
 You may also see any lint errors in the console.
 
+"https://kisan-set-frontend-71z4.vercel.app"
+"https://kisan-set-frontend-71z4-co8mb1gb5-amit2003dhs-projects.vercel.app"
+"https://kisan-set-frontend-71z4-git-main-amit2003dhs-projects.vercel.app" 
+
 ### `npm test`
 
 Launches the test runner in the interactive watch mode.\
